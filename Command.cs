@@ -4,8 +4,13 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
 using Newtonsoft.Json;
-using System.Collections;
 
+/**
+ * <summary>
+ * Base Class for all Commands.
+ * Contains all essential methods to interface with a command
+ * </summary>
+ */
 public abstract class Command
 {
     #region Static Fields
@@ -25,33 +30,52 @@ public abstract class Command
     public GameObject commandObject;
     #endregion
 
+    /**
+     * <summary>
+     * Base Constructor which initializes basic values
+     * </summary>
+     */
     protected Command()
     {
         this.id = Command.Id_Counter + 1;
         Command.Id_Counter++;
-        //Debug.Log("New Command id is: " + this.id);
-        this.title = "error uwu";
+        this.title = "ERROR";
         this.lamps = new List<int>() { 0,1,2,3,4,5,6 };
 
         this.settings = new List<Setting>() { Setting.COMMAND, Setting.TITLE, Setting.LAMPS };
     }
-    
+
+    /**
+     * <summary>
+     * Get the WWWForm that is required in order to play this specific command
+     * </summary>
+     */
     public virtual WWWForm GetRequestForm()
     {
         WWWForm www = new WWWForm();
-        //Debug.Log(JsonConvert.SerializeObject(new List<List<Dictionary<string, object>>>() { GetRequestList() }));
         www.AddField("cmd", JsonConvert.SerializeObject(new List<List<Dictionary<string, object>>>() { GetRequestList() }));
         return www;
     }
+    /**
+     * <summary>
+     * Get a command list containing only this command
+     * </summary>
+     */
     public virtual List<Dictionary<string, object>> GetRequestList()
     {
         return GetRequestList(new List<Dictionary<string, object>>());
     }
+    /**
+     * <summary>
+     * Get a command list where this command is appended to all previous
+     * </summary>
+     */
     public abstract List<Dictionary<string, object>> GetRequestList(List<Dictionary<string, object>> dics);
-    public virtual string GetSaveString()
-    {
-        return string.Format("{0};{1};{2}", commandTitle, title, string.Join(",", lamps));
-    }
+    /**
+     * <summary>
+     * Get a dictionary containing all values that need to be saved
+     * </summary>
+     */
     public virtual Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = new Dictionary<string, object>();
@@ -62,37 +86,65 @@ public abstract class Command
 
         return output;
     }
+
+    /**
+     * <summary>
+     * Initialize the commands object with all buttons and display it
+     * </summary>
+     */
     public virtual void Init()
     {
+        // Add functionality to play button
         commandObject.transform.Find("play").gameObject.GetComponent<Button>().onClick.AddListener(new UnityAction(PostPlay));
 
+        // Add functionality to command remove button and hide
         commandObject.transform.Find("remove").gameObject.GetComponent<Button>().onClick.AddListener(new UnityAction(() => { GameObject.Find("Main Camera").GetComponent<Main>().RemoveCommand(this); }));
         commandObject.transform.Find("remove").gameObject.SetActive(false);
 
+        // Add functionality to command duplicate button and hide
         commandObject.transform.Find("duplicate").gameObject.GetComponent<Button>().onClick.AddListener(new UnityAction(() => { GameObject.Find("Main Camera").GetComponent<Main>().DuplicateCommand(this); }));
         commandObject.transform.Find("duplicate").gameObject.SetActive(false);
 
+        // Add functionality to command settings button
         commandObject.transform.Find("settings").gameObject.GetComponent<Button>().onClick.AddListener(new UnityAction(() => { GameObject.Find("Main Camera").GetComponent<Main>().settingsObject.GetComponent<Settings>().openSettings(this); }));
         //commandObject.transform.Find("settings").gameObject.SetActive(false);
 
+        // Add functionality to command moveup button and hide
         commandObject.transform.Find("moveup").gameObject.GetComponent<Button>().onClick.AddListener(new UnityAction(() => { GameObject.Find("Main Camera").GetComponent<Main>().MoveUp(this); }));
         commandObject.transform.Find("moveup").gameObject.SetActive(false);
 
+        // Add functionality to command movedown button and hide
         commandObject.transform.Find("movedown").gameObject.GetComponent<Button>().onClick.AddListener(new UnityAction(() => { GameObject.Find("Main Camera").GetComponent<Main>().MoveDown(this); }));
         commandObject.transform.Find("movedown").gameObject.SetActive(false);
-
+        
         Render();
     }
+    /**
+     * <summary>
+     * Display all changes that arent buttons, such like titles or background specifics.
+     * Overwrite in child classes to further realize command specific changes
+     * </summary>
+     */
     public virtual void Render()
     {
         commandObject.transform.Find("title").gameObject.GetComponent<Text>().text = title;
     }
 
+    /**
+     * <summary>
+     * Play the command associated with this object via posting all neccesary values to the server
+     * </summary>
+     */
     public void PostPlay()
     {
         networkObject.GetComponent<Network>().Request(this.GetRequestForm());
     }
 
+    /**
+     * <summary>
+     * Method base for retrieving all settings from this <see cref="Command"/>
+     * </summary>
+     */
     public virtual Dictionary<Setting, object> GetSettings()
     {
         Dictionary<Setting, object> sets = new Dictionary<Setting, object>();
@@ -101,6 +153,11 @@ public abstract class Command
         sets.Add(Setting.LAMPS, lamps);
         return sets;
     }
+    /**
+     * <summary>
+     * Method base for saving all settings to this <see cref="Command"/>
+     * </summary>
+     */
     public virtual void SaveSettings(Dictionary<Setting, object> settings)
     {
         if (settings.TryGetValue(Setting.TITLE, out object value))
@@ -110,6 +167,13 @@ public abstract class Command
     }
 }
 
+#region Basic Command Subclasses
+/**
+ * <summary>
+ * Class representing the rainbow command
+ * which is a moving rainbow over all configured lamps
+ * </summary>
+ */
 public class RainbowCommand : Command
 {
     public int wait_ms;
@@ -123,48 +187,13 @@ public class RainbowCommand : Command
 
         this.settings.Add(Setting.WAIT_MS);
     }
-    public RainbowCommand(Command cmd) : this(cmd.title, ((RainbowCommand)cmd).wait_ms)
-    {
-
-    }
-    public RainbowCommand(Command cmd, GameObject obj) : this(obj, cmd.title, ((RainbowCommand)cmd).wait_ms)
-    {
-
-    }
-
-    public RainbowCommand(string title) : this()
-    {
-        this.title = title;
-    }
-    public RainbowCommand(int wait_ms) : this()
-    {
-        this.wait_ms = wait_ms;
-    }
-    public RainbowCommand(string title, int wait_ms) : this(title)
-    {
-        this.wait_ms = wait_ms;
-    }
-
     public RainbowCommand(GameObject obj) : this()
     {
         this.commandObject = obj;
 
         this.Init();
     }
-    public RainbowCommand(GameObject obj, string title) : this(obj)
-    {
-        this.title = title;
-        this.Render();
-    }
-    public RainbowCommand(GameObject obj, string title, int wait_ms) : this(obj, title)
-    {
-        this.wait_ms = wait_ms;
-    }
     
-    public override string GetSaveString()
-    {
-        return string.Format("{0};{1}", base.GetSaveString(), wait_ms);
-    }
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
@@ -195,12 +224,18 @@ public class RainbowCommand : Command
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.WAIT_MS, out value))
+        if (settings.TryGetValue(Setting.WAIT_MS, out object value))
             this.wait_ms = (int)value;
     }
 }
+/**
+ * <summary>
+ * Class representing the stationary rainbow command
+ * which is a rainbow that fades over all configured lamps simultaniously.
+ * </summary>
+ * Difference to the normal rainbow command is here all lamps have the same color at a given time
+ */
 public class StatRainbowCommand : Command
 {
     public int wait_ms;
@@ -214,39 +249,13 @@ public class StatRainbowCommand : Command
 
         this.settings.AddRange(new Setting[] { Setting.WAIT_MS });
     }
-    public StatRainbowCommand(string title) : this()
-    {
-        this.title = title;
-    }
-    public StatRainbowCommand(int wait_ms) : this()
-    {
-        this.wait_ms = wait_ms;
-    }
-    public StatRainbowCommand(string title, int wait_ms) : this(title)
-    {
-        this.wait_ms = wait_ms;
-    }
-
     public StatRainbowCommand(GameObject obj) : this()
     {
         this.commandObject = obj;
 
         this.Init();
     }
-    public StatRainbowCommand(GameObject obj, string title) : this(obj)
-    {
-        this.title = title;
-        this.Render();
-    }
-    public StatRainbowCommand(GameObject obj, string title, int wait_ms) : this(obj, title)
-    {
-        this.wait_ms = wait_ms;
-    }
     
-    public override string GetSaveString()
-    {
-        return string.Format("{0};{1}", base.GetSaveString(), wait_ms);
-    }
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
@@ -269,11 +278,6 @@ public class StatRainbowCommand : Command
         return dics;
     }
 
-    public override void Render()
-    {
-        base.Render();
-    }
-
     public override Dictionary<Setting, object> GetSettings()
     {
         Dictionary<Setting, object> sets = base.GetSettings();
@@ -282,12 +286,17 @@ public class StatRainbowCommand : Command
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.WAIT_MS, out value))
+        if (settings.TryGetValue(Setting.WAIT_MS, out object value))
             this.wait_ms = (int)value;
     }
 }
+/**
+ * <summary>
+ * Class representing the theater command,
+ * which is a theater chase over all configured lamps
+ * </summary>
+ */
 public class TheaterCommand : Command
 {
     public Color color;
@@ -304,57 +313,13 @@ public class TheaterCommand : Command
 
         this.settings.AddRange(new Setting[] { Setting.COLOR, Setting.WAIT_MS, Setting.ITERATIONS });
     }
-    public TheaterCommand(string title) : this()
-    {
-        this.title = title;
-    }
-    public TheaterCommand(Color color) : this()
-    {
-        this.color = color;
-    }
-    public TheaterCommand(Color color, int wait_ms, int iterations) : this(color)
-    {
-        this.wait_ms = wait_ms;
-        this.iterations = iterations;
-    }
-    public TheaterCommand(string title, Color color) : this(title)
-    {
-        this.color = color;
-    }
-    public TheaterCommand(string title, Color color, int wait_ms, int iterations) : this(color, wait_ms, iterations)
-    {
-        this.title = title;
-    }
-
     public TheaterCommand(GameObject obj) : this()
     {
         this.commandObject = obj;
 
         this.Init();
     }
-    public TheaterCommand(GameObject obj, string title) : this(obj)
-    {
-        this.title = title;
-
-        this.Render();
-    }
-    public TheaterCommand(GameObject obj, Color color) : this(obj)
-    {
-        this.color = color;
-
-        this.Render();
-    }
-    public TheaterCommand(GameObject obj, string title, Color color) : this(obj, title)
-    {
-        this.color = color;
-
-        this.Render();
-    }
     
-    public override string GetSaveString()
-    {
-        return string.Format("{0};{1},{2},{3};{4};{5}", base.GetSaveString(), Mathf.Round(this.color.r * 255), Mathf.Round(this.color.g * 255), Mathf.Round(this.color.b * 255), this.wait_ms, this.iterations);
-    }
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
@@ -397,9 +362,8 @@ public class TheaterCommand : Command
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.COLOR, out value))
+        if (settings.TryGetValue(Setting.COLOR, out object value))
             this.color = (Color)value;
         if (settings.TryGetValue(Setting.WAIT_MS, out value))
             this.wait_ms = (int)value;
@@ -407,6 +371,12 @@ public class TheaterCommand : Command
             this.iterations = (int)value;
     }
 }
+/**
+ * <summary>
+ * Class representing the theater rainbow command,
+ * which is a moving theater chase rainbow over all configured lamps
+ * </summary>
+ */
 public class TheaterRainbowCommand : Command
 {
     public int wait_ms;
@@ -419,46 +389,17 @@ public class TheaterRainbowCommand : Command
 
         this.settings.AddRange(new Setting[] { Setting.WAIT_MS });
     }
-    public TheaterRainbowCommand(string title) : this()
-    {
-        this.title = title;
-    }
-    public TheaterRainbowCommand(int wait_ms) : this()
-    {
-        this.wait_ms = wait_ms;
-    }
-    public TheaterRainbowCommand(string title, int wait_ms) : this(wait_ms)
-    {
-        this.title = title;
-    }
-
     public TheaterRainbowCommand(GameObject obj) : this()
     {
         this.commandObject = obj;
 
         this.Init();
     }
-    public TheaterRainbowCommand(GameObject obj, string title) : this(obj)
-    {
-        this.title = title;
-
-        this.Render();
-    }
-    public TheaterRainbowCommand(GameObject obj, int wait_ms) : this(obj)
-    {
-        this.wait_ms = wait_ms;
-    }
     
-    public override string GetSaveString()
-    {
-        return string.Format("{0};{1}", base.GetSaveString(), this.wait_ms);
-    }
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
-
         output.Add("wait_ms", wait_ms);
-
         return output;
     }
     public override List<Dictionary<string, object>> GetRequestList(List<Dictionary<string, object>> dics)
@@ -475,11 +416,6 @@ public class TheaterRainbowCommand : Command
         return dics;
     }
 
-    public override void Render()
-    {
-        base.Render();
-    }
-
     public override Dictionary<Setting, object> GetSettings()
     {
         Dictionary<Setting, object> sets = base.GetSettings();
@@ -488,12 +424,17 @@ public class TheaterRainbowCommand : Command
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.WAIT_MS, out value))
+        if (settings.TryGetValue(Setting.WAIT_MS, out object value))
             this.wait_ms = (int)value;
     }
 }
+/**
+ * <summary>
+ * Class representing the colorwipe command,
+ * which is a wipe of a certain color over all configured lamps
+ * </summary>
+ */
 public class ColorwipeCommand : Command
 {
     public Color color;
@@ -508,45 +449,13 @@ public class ColorwipeCommand : Command
 
         this.settings.AddRange(new Setting[] { Setting.COLOR, Setting.WAIT_MS });
     }
-    public ColorwipeCommand(Color color) : this()
-    {
-        this.color = color;
-    }
-    public ColorwipeCommand(int wait_ms) : this()
-    {
-        this.wait_ms = wait_ms;
-    }
-    public ColorwipeCommand(Color color, int wait_ms) : this()
-{
-        this.color = color;
-        this.wait_ms = wait_ms;
-    }
-    public ColorwipeCommand(string title, Color color, int wait_ms) : this(color, wait_ms)
-    {
-        this.title = title;
-    }
-
     public ColorwipeCommand(GameObject obj) : this()
     {
         this.commandObject = obj;
 
         this.Init();
     }
-    public ColorwipeCommand(GameObject obj, Color color) : this(obj)
-    {
-        this.color = color;
-
-        this.Render();
-    }
-    public ColorwipeCommand(GameObject obj, int wait_ms) : this(obj)
-    {
-        this.wait_ms = wait_ms;
-    }
     
-    public override string GetSaveString()
-    {
-        return string.Format("{0};{1},{2},{3};{4}", base.GetSaveString(), Mathf.Round(this.color.r * 255), Mathf.Round(this.color.g * 255), Mathf.Round(this.color.b * 255), this.wait_ms);
-    }
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
@@ -586,14 +495,19 @@ public class ColorwipeCommand : Command
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.COLOR, out value))
+        if (settings.TryGetValue(Setting.COLOR, out object value))
             this.color = (Color)value;
         if (settings.TryGetValue(Setting.WAIT_MS, out value))
             this.wait_ms = (int)value;
     }
 }
+/**
+ * <summary>
+ * Class representing the set color command,
+ * which sets a certain color all configured lamps
+ * </summary>
+ */
 public class SetColorCommand : Command
 {
     public Color color;
@@ -606,29 +520,11 @@ public class SetColorCommand : Command
 
         this.settings.Add(Setting.COLOR);
     }
-    public SetColorCommand(Color color) : this()
-    {
-        this.color = color;
-    }
-    public SetColorCommand(string title, Color color) : this(color)
-    {
-        this.title = title;
-    }
     public SetColorCommand(GameObject obj) : this()
     {
         this.commandObject = obj;
 
         Init();
-    }
-    public SetColorCommand(GameObject obj, Color color) : this(obj)
-    {
-        this.color = color;
-        this.Render();
-    }
-    public SetColorCommand(GameObject obj, string title, Color color) : this(obj, color)
-    {
-        this.title = title;
-        this.Render();
     }
 
     public override void Render()
@@ -637,16 +533,10 @@ public class SetColorCommand : Command
         commandObject.transform.Find("background").gameObject.GetComponent<RawImage>().color = this.color;
     }
     
-    public override string GetSaveString()
-    {
-        return string.Format("{0};{1},{2},{3}", base.GetSaveString(), Mathf.Round(this.color.r * 255), Mathf.Round(this.color.g * 255), Mathf.Round(this.color.b * 255));
-    }
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
-
         output.Add("color", Helper.To32Bit(color));
-
         return output;
     }
     public override List<Dictionary<string, object>> GetRequestList(List<Dictionary<string, object>> dics)
@@ -671,12 +561,17 @@ public class SetColorCommand : Command
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.COLOR, out value))
+        if (settings.TryGetValue(Setting.COLOR, out object value))
             this.color = (Color)value;
     }
 }
+/**
+ * <summary>
+ * Class representing the interpolate command,
+ * which interpolates between two certain colors on all configured lamps
+ * </summary>
+ */
 public class InterpolateCommand : Command
 {
     public Color color;
@@ -693,18 +588,7 @@ public class InterpolateCommand : Command
         this.goback = false;
 
         this.title = "inter_" + this.id.ToString();
-        this.settings.AddRange(new Setting[]{ Setting.COLOR, Setting.COLOR2, Setting.DURATION_MS, Setting.GOBACK });
-    }
-    public InterpolateCommand(Color color, Color color2, int duration_ms, bool goback) : this()
-    {
-        this.color = color;
-        this.color2 = color2;
-        this.duration_ms = duration_ms;
-        this.goback = goback;
-    }
-    public InterpolateCommand(string title, Color color, Color color2, int duration_ms, bool goback) : this(color, color2, duration_ms, goback)
-    {
-        this.title = title;
+        this.settings.AddRange(new Setting[]{ Setting.COLOR, Setting.COLOR_2, Setting.DURATION_MS, Setting.GOBACK });
     }
     public InterpolateCommand(GameObject obj) : this()
     {
@@ -712,17 +596,6 @@ public class InterpolateCommand : Command
         this.Init();
     }
     
-    public override string GetSaveString()
-    {
-        return string.Format("{0};" +
-            "{1},{2},{3};" +
-            "{4},{5},{6};" +
-            "{7};{8}",
-            base.GetSaveString(),
-            Mathf.Round(this.color.r * 255), Mathf.Round(this.color.g * 255), Mathf.Round(this.color.b * 255),
-            Mathf.Round(this.color2.r * 255), Mathf.Round(this.color2.g * 255), Mathf.Round(this.color2.b * 255),
-            this.duration_ms, this.goback);
-    }
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
@@ -768,18 +641,17 @@ public class InterpolateCommand : Command
     {
         Dictionary<Setting, object> sets = base.GetSettings();
         sets.Add(Setting.COLOR, color);
-        sets.Add(Setting.COLOR2, color2);
+        sets.Add(Setting.COLOR_2, color2);
         sets.Add(Setting.DURATION_MS, duration_ms);
         sets.Add(Setting.GOBACK, goback);
         return sets;
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.COLOR, out value))
+        if (settings.TryGetValue(Setting.COLOR, out object value))
             this.color = (Color)value;
-        if (settings.TryGetValue(Setting.COLOR2, out value))
+        if (settings.TryGetValue(Setting.COLOR_2, out value))
             this.color2 = (Color)value;
         if (settings.TryGetValue(Setting.DURATION_MS, out value))
             this.duration_ms = (int)value;
@@ -787,7 +659,15 @@ public class InterpolateCommand : Command
             this.goback = (bool)value;
     }
 }
+#endregion
 
+#region Structure Command Subclasses
+/**
+ * <summary>
+ * Class representing the split command,
+ * which splits the thread flow into the current list and a new list to concurrently be executed
+ * </summary>
+ */
 public class SplitCommand : Command
 {
     public int newList;
@@ -802,18 +682,10 @@ public class SplitCommand : Command
         this.title = "Go To " + this.newList.ToString();
         this.settings.AddRange(new Setting[] { Setting.SPLITLIST, Setting.LOOPLIST });
     }
-    public SplitCommand(int newList) : this()
-    {
-        this.newList = newList;
-    }
     public SplitCommand(GameObject obj) : this()
     {
         this.commandObject = obj;
         this.Init();
-    }
-    public SplitCommand(GameObject obj, int newList) : this(obj)
-    {
-        this.newList = newList;
     }
 
     public override void Init()
@@ -822,11 +694,6 @@ public class SplitCommand : Command
         commandObject.transform.Find("play").gameObject.SetActive(false);
     }
 
-    public override string GetSaveString()
-    {
-        return string.Format("{0};" + "{1}",
-            base.GetSaveString(), newList);
-    }
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
@@ -859,14 +726,19 @@ public class SplitCommand : Command
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.SPLITLIST, out value))
+        if (settings.TryGetValue(Setting.SPLITLIST, out object value))
             this.newList = (int)value;
         if (settings.TryGetValue(Setting.LOOPLIST, out value))
             this.looplist = (bool)value;
     }
 }
+/**
+ * <summary>
+ * Class representing the join command,
+ * which joins back a certain thread in the thread flow to resynchronize it in respect to the current thread
+ * </summary>
+ */
 public class JoinCommand : Command
 {
     public int listtojoin;
@@ -881,18 +753,10 @@ public class JoinCommand : Command
         this.title = "Go To " + this.listtojoin.ToString();
         this.settings.AddRange(new Setting[] { Setting.JOINLIST, Setting.WAITLIST });
     }
-    public JoinCommand(int listtojoin) : this()
-    {
-        this.listtojoin = listtojoin;
-    }
     public JoinCommand(GameObject obj) : this()
     {
         this.commandObject = obj;
         this.Init();
-    }
-    public JoinCommand(GameObject obj, int listtojoin) : this(obj)
-    {
-        this.listtojoin = listtojoin;
     }
 
     public override void Init()
@@ -900,12 +764,7 @@ public class JoinCommand : Command
         base.Init();
         commandObject.transform.Find("play").gameObject.SetActive(false);
     }
-
-    public override string GetSaveString()
-    {
-        return string.Format("{0};" + "{1}",
-            base.GetSaveString(), listtojoin);
-    }
+    
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
@@ -938,15 +797,21 @@ public class JoinCommand : Command
     }
     public override void SaveSettings(Dictionary<Setting, object> settings)
     {
-        object value;
         base.SaveSettings(settings);
-        if (settings.TryGetValue(Setting.JOINLIST, out value))
+        if (settings.TryGetValue(Setting.JOINLIST, out object value))
             this.listtojoin = (int)value;
         if (settings.TryGetValue(Setting.WAITLIST, out value))
             this.waitlist = (bool)value;
     }
 }
 
+/**
+ * <summary>
+ * Class representing the stop command,
+ * which terminates all command and program execution.
+ * </summary>
+ * This command is intended for debugging and remote shutdown purposes
+ */
 public class StopCommand : Command
 {
     public StopCommand()
@@ -965,9 +830,15 @@ public class StopCommand : Command
         return dics;
     }
 
-    public override Dictionary<Setting, object> GetSettings() { return new Dictionary<Setting, object>(); }
-    public override void SaveSettings(Dictionary<Setting, object> settings) { }
+    public override Dictionary<Setting, object> GetSettings() { return base.GetSettings(); }
+    public override void SaveSettings(Dictionary<Setting, object> settings) { base.SaveSettings(settings); }
 }
+/**
+ * <summary>
+ * Class representing the wait command,
+ * which waits a certain amount of time before the next command is executed
+ * </summary>
+ */
 public class WaitCommand : Command
 {
     public int duration_ms;
@@ -978,10 +849,6 @@ public class WaitCommand : Command
         this.commandTitle = "wait";
         this.duration_ms = 1000;
         this.settings.Add(Setting.DURATION_MS);
-    }
-    public WaitCommand(int duration_ms) : this()
-    {
-        this.duration_ms = duration_ms;
     }
     public WaitCommand(GameObject obj) : this()
     {
@@ -994,11 +861,7 @@ public class WaitCommand : Command
         base.Render();
         commandObject.transform.Find("title").gameObject.GetComponent<Text>().text = "Wait " + duration_ms + " ms";
     }
-
-    public override string GetSaveString()
-    {
-        return string.Format("{0};{1}", base.GetSaveString(), duration_ms);
-    }
+    
     public override Dictionary<string, object> GetSaveDic()
     {
         Dictionary<string, object> output = base.GetSaveDic();
@@ -1032,9 +895,21 @@ public class WaitCommand : Command
             this.duration_ms = (int)value;
     }
 }
+#endregion
 
+/**
+ * <summary>
+ * Static Helper class to use in Command Base or Subclass,
+ * currently only containing color bit format conversion
+ * </summary>
+ */
 public static class Helper
 {
+    /**
+     * <summary>
+     * Converting a color from the unity color system to an integer
+     * </summary>
+     */
     public static int To32Bit(Color color)
     {
         return Convert.ToInt32(
@@ -1043,6 +918,11 @@ public static class Helper
             + Convert.ToString(Mathf.RoundToInt(color.b * 255f), 2).PadLeft(8, '0')
             , 2);
     }
+    /**
+     * <summary>
+     * Converting a color from an integer to a unity color value
+     * </summary>
+     */
     public static Color ToColor(int color)
     {
         string binary = Convert.ToString(color, 2).PadLeft(24, '0');

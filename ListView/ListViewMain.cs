@@ -13,16 +13,18 @@ public class ListViewMain : MonoBehaviour
 
     public GameObject settingsObject;
     
-
     // Start is called before the first frame update
     void Start()
     {
+        // Init important attributes
         CommandList.networkObject = this.gameObject;
         Command.networkObject = this.gameObject;
         settingsObject.SetActive(false);
 
+        // Parse all available files to lists
         lists = Parser.ParseAll();
 
+        // Display all lists represented by an object each
         foreach (CommandList cmd in lists)
         {
             GameObject obj = Instantiate(listPrefab, listObject.transform);
@@ -31,12 +33,11 @@ public class ListViewMain : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
+    /**
+     * <summary>
+     * Adds a <see cref="CommandList"/> visible for the user and creates a file for it
+     * </summary>
+     */
     public void AddList()
     {
         GameObject obj = Instantiate(listPrefab, listObject.transform);
@@ -45,12 +46,22 @@ public class ListViewMain : MonoBehaviour
         Parser.Encode(lists);
     }
 
+    /**
+     * <summary>
+     * Displays the confirm dialog for removing a <see cref="CommandList"/>
+     * </summary>
+     */
     public void PotRemoveList(CommandList list)
     {
         deleteDialogObject.SetActive(true);
         deleteDialogObject.transform.Find("yes").gameObject.GetComponent<Button>().onClick.RemoveAllListeners();
         deleteDialogObject.transform.Find("yes").gameObject.GetComponent<Button>().onClick.AddListener(new UnityEngine.Events.UnityAction(() => { RemoveList(list); deleteDialogObject.SetActive(false); }));
     }
+    /**
+     * <summary>
+     * Removes a <see cref="CommandList"/> and its <see cref="GameObject"/>
+     * </summary>
+     */
     public void RemoveList(CommandList list)
     {
         Destroy(list.listObject);
@@ -59,11 +70,21 @@ public class ListViewMain : MonoBehaviour
         File.Delete(Application.persistentDataPath + "/commandlists/" + list.name + ".json");
     }
 
+    /**
+     * <summary>
+     * Save all lists to their respective files
+     * </summary>
+     */
     public void Save()
     {
         Parser.Encode(lists);
     }
 
+    /**
+     * <summary>
+     * Toggles all modify buttons on the <see cref="CommandList"/> objects on or off
+     * </summary>
+     */
     public void ToggleModify(bool state)
     {
         if (state)
@@ -98,10 +119,14 @@ public class ListViewMain : MonoBehaviour
         }
     }
 
+    /**
+     * <summary>
+     * Moves a <see cref="CommandList"/> object up one spot, if possible
+     * </summary>
+     */
     public void MoveUp(CommandList list)
     {
         int idx = lists.IndexOf(list);
-        //Debug.Log(idx);
 
         if (idx > 0)
         {
@@ -109,13 +134,16 @@ public class ListViewMain : MonoBehaviour
             lists[idx - 1] = list;
             lists[idx] = cmd2;
         }
-        //Debug.Log(string.Join(", ", list));
         Render();
     }
+    /**
+     * <summary>
+     * Moves a <see cref="CommandList"/> object down one spot, if possible
+     * </summary>
+     */
     public void MoveDown(CommandList list)
     {
         int idx = lists.IndexOf(list);
-        //Debug.Log(idx);
 
         if (idx < lists.Count - 1)
         {
@@ -123,36 +151,42 @@ public class ListViewMain : MonoBehaviour
             lists[idx + 1] = list;
             lists[idx] = cmd2;
         }
-        //Debug.Log(string.Join(", ", list));
         Render();
     }
 
+    /**
+     * <summary>
+     * Displays all changes in object order onscreen
+     * </summary>
+     */
     void Render()
     {
-        int offset = -60;
+        int idx = 0;
         foreach (CommandList cmd in lists)
         {
-            Vector3 pos = cmd.listObject.transform.localPosition;
-            cmd.listObject.transform.localPosition = new Vector3(pos.x, offset, pos.z);
-            offset -= 130;
+            cmd.listObject.transform.SetSiblingIndex(idx);
+            idx++;
         }
     }
 
+    /**
+     * <summary>
+     * Effectively turns the lamp off by setting the color of all lamps to black
+     * </summary>
+     */
     public void Off()
     {
-        new SetColorCommand(new Color(0f, 0f, 0f)).PostPlay();
+        SetColorCommand cmd = new SetColorCommand();
+        cmd.color = new Color(0f, 0f, 0f);
+        cmd.PostPlay();
     }
+    /**
+     * <summary>
+     * Terminates the lamp program and process execution
+     * </summary>
+     */
     public void Stop()
     {
         new StopCommand().PostPlay();
-        BrightnessStop();
-    }
-    public void BrightnessStop()
-    {
-        WWWForm www = new WWWForm();
-
-        www.AddField("brightness[]", "terminate");
-
-        this.gameObject.GetComponent<Network>().Request(www);
     }
 }

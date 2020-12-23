@@ -1,16 +1,13 @@
-﻿using System.Collections;
-using System.IO;
+﻿using System.IO;
 using System;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
 public class Main : MonoBehaviour
 {
-    GameObject settings;
+    private GameObject settings;
 
     public CommandList commands = new CommandList();
     public GameObject commandsObject;
@@ -26,6 +23,7 @@ public class Main : MonoBehaviour
     
     SettingSave save;
 
+    // Start is called once before the first frame
     void Start()
     {
         // Load Settings from Storage
@@ -33,7 +31,7 @@ public class Main : MonoBehaviour
         
         // Load Commands from Storage
         commands = Parser.Parse(PlayerPrefs.GetString("list", "base"));
-        foreach (PartCommandList cmd in commands.list)
+        foreach (PartCommandList cmd in commands.lists)
         {
             cmd.listObject = Instantiate(partCommandPrefab, commandsObject.transform);
             foreach(Command cmdd in cmd.list)
@@ -43,13 +41,18 @@ public class Main : MonoBehaviour
             }
         }
 
-        // Init important Objects status
+        // Init important Object attributes
         Command.networkObject = this.gameObject;
         CommandList.networkObject = this.gameObject;
         settingsObject.SetActive(false);
         CheckLists();
     }
 
+    /**
+     * <summary>
+     * Adds a <see cref="Command"/> to the <see cref="PartCommandList"/>, if no command name is specified it uses <see cref="RainbowCommand"/>
+     * </summary>
+     */
     public void AddCommand(PartCommandList part, string name="rainbow")
     {
         if (name == "rainbow")
@@ -108,19 +111,29 @@ public class Main : MonoBehaviour
         if (save.autosave)
             Save();
     }
+    /**
+     * <summary>
+     * Adds a standard <see cref="RainbowCommand"/> to the <see cref="PartCommandList"/> specified by the parameter
+     * </summary>
+     */
     public void AddCommand(int listnum)
     {
         PartCommandList part;
-        if (listnum >= commands.list.Count)
+        if (listnum >= commands.lists.Count)
             part = AddList();
         else
-            part = commands.list[listnum];
+            part = commands.lists[listnum];
 
         AddCommand(part);
     }
+    /**
+     * <summary>
+     * Duplicates a given <see cref="Command"/> and appends it to the <see cref="PartCommandList"/> it is in
+     * </summary>
+     */
     public void DuplicateCommand(Command cmd)
     {
-        foreach (PartCommandList list in commands.list)
+        foreach (PartCommandList list in commands.lists)
         {
             if (list.list.Contains(cmd))
             {
@@ -136,35 +149,34 @@ public class Main : MonoBehaviour
         if (save.autosave)
             Save();
     }
+    /**
+     * <summary>
+     * Removes a given <see cref="Command"/> from its <see cref="PartCommandList"/>
+     * </summary>
+     */
     public void RemoveCommand(Command cmd)
     {
         Destroy(cmd.commandObject);
         List<PartCommandList> liststoRemove = new List<PartCommandList>();
-        foreach (PartCommandList list in commands.list)
+        foreach (PartCommandList list in commands.lists)
         {
             if (list.list.Contains(cmd))
                 list.list.Remove(cmd);
-            /**
-            if (list.list.Count == 0)
-                liststoRemove.Add(list);
-            */
         }
-        /**
-        foreach (PartCommandList list in liststoRemove)
-        {
-            commands.list.Remove(list);
-            Destroy(list.listObject);
-        }
-        */
-
 
         CheckLists();
 
         if (save.autosave)
             Save();
     }
+    /**
+     * <summary>
+     * Changes the <see cref="Command"/> object to the new dynamic type specified by newSetting
+     * </summary>
+     */ 
     public void ChangeCommand(Command cmd, string newSetting)
     {
+        // Initializing the subtype
         Command newCommand;
         if (newSetting == "rainbow")
         {
@@ -211,32 +223,43 @@ public class Main : MonoBehaviour
             newCommand = new RainbowCommand();
         }
 
+        // Saves all settings from the old command that the new Command has
         newCommand.SaveSettings(cmd.GetSettings());
+
+        // Replaces the old Gameobject with a fresh one and initializes it
         int idx = 0;
         int i = 0;
-        foreach (PartCommandList list in commands.list)
+        foreach (PartCommandList list in commands.lists)
         {
             if (list.list.Contains(cmd))
             {
                 idx = list.Remove(cmd);
                 list.list.Insert(idx, newCommand);
 
-                i = commands.list.IndexOf(list);
+                i = commands.lists.IndexOf(list);
             }
         }
-        GameObject obj = Instantiate(commandPrefab, commands.list[i].listObject.transform);
+        GameObject obj = Instantiate(commandPrefab, commands.lists[i].listObject.transform);
         newCommand.commandObject = obj;
         newCommand.Init();
 
         obj.transform.SetSiblingIndex(idx);
 
+        // Deletes the old Gameobject to be picked up by garbage collector
         GameObject.Destroy(cmd.commandObject);
     }
-    public void ToggleModify(bool state)
+
+    /**
+     * <summary>
+     * Toggle for the modify buttons on all current <see cref="Command"/> GameObjects
+     * </summary>
+     */
+    public void ToggleModify(bool modifyState)
     {
-        if (state)
+        // Toggle on
+        if (modifyState)
         {
-            foreach (PartCommandList cmdlist in commands.list)
+            foreach (PartCommandList cmdlist in commands.lists)
             {
                 foreach (Command cmd in cmdlist.list)
                 {
@@ -249,18 +272,19 @@ public class Main : MonoBehaviour
                     cmd.commandObject.transform.Find("movedown").gameObject.SetActive(true);
                 }
             }
-        } else
+        } else // Toggle off
         {
-            foreach (PartCommandList cmdlist in commands.list)
+            foreach (PartCommandList cmdlist in commands.lists)
             {
                 foreach (Command cmd in cmdlist.list)
                 {
                     cmd.commandObject.transform.Find("remove").gameObject.SetActive(false);
                     cmd.commandObject.transform.Find("duplicate").gameObject.SetActive(false);
 
-                    if (!cmd.GetType().Equals(typeof(SplitCommand)) &&
-                        !cmd.GetType().Equals(typeof(JoinCommand)))
+                    // Only activate the play button if the command is not of type split or join
+                    if (!cmd.GetType().Equals(typeof(SplitCommand)) && !cmd.GetType().Equals(typeof(JoinCommand)))
                         cmd.commandObject.transform.Find("play").gameObject.SetActive(true);
+
                     cmd.commandObject.transform.Find("settings").gameObject.SetActive(true);
                     cmd.commandObject.transform.Find("moveup").gameObject.SetActive(false);
                     cmd.commandObject.transform.Find("movedown").gameObject.SetActive(false);
@@ -269,6 +293,11 @@ public class Main : MonoBehaviour
         }
     }
 
+    /**
+     * <summary>
+     * Moves the supplied <see cref="Command"/> in its <see cref="PartCommandList"/> up one spot, if possible
+     * </summary>
+     */
     public void MoveUp(Command cmd)
     {
         commands.MoveUp(cmd);
@@ -276,6 +305,11 @@ public class Main : MonoBehaviour
         if (save.autosave)
             Save();
     }
+    /**
+     * <summary>
+     * Moves the supplied <see cref="Command"/> in its <see cref="PartCommandList"/> down one spot, if possible
+     * </summary>
+     */
     public void MoveDown(Command cmd)
     {
         commands.MoveDown(cmd);
@@ -284,159 +318,187 @@ public class Main : MonoBehaviour
             Save();
     }
 
+    /**
+     * <summary>
+     * Adds a new <see cref="PartCommandList"/> to the <see cref="CommandList"/> and the screen
+     * </summary>
+     */
     public PartCommandList AddList()
     {
         PartCommandList part = new PartCommandList();
         part.listObject = Instantiate(partCommandPrefab, commandsObject.transform);
-        commands.list.Add(part);
+        commands.lists.Add(part);
 
         CheckLists();
 
         return part;
     }
 
+    /**
+     * <summary>
+     * Plays all Commands in the current <see cref="CommandList"/>
+     * </summary>
+     */
     public void PlayAll()
     {
         commands.PostPlay();
     }
-    public void StopAll()
+    /**
+     * <summary>
+     * Turns the lamp off by setting black as the color
+     * </summary>
+     */
+    public void Off()
     {
-        new SetColorCommand(new Color(0f, 0f, 0f)).PostPlay();
+        SetColorCommand cmd = new SetColorCommand();
+        cmd.color = new Color(0f, 0f, 0f);
+        cmd.PostPlay();
     }
-    public void PotStop()
+    /**
+     * <summary>
+     * Displays the dialog to confirm a full process and programm termination
+     * </summary>
+     */
+    public void PotentialStop()
     {
         stopDialog.SetActive(true);
         stopDialog.transform.Find("yes").gameObject.GetComponent<Button>().onClick.RemoveAllListeners();
-        stopDialog.transform.Find("yes").gameObject.GetComponent<Button>().onClick.AddListener(new UnityEngine.Events.UnityAction(() => { Stop(); BrightnessStop(); stopDialog.SetActive(false); }));
+        stopDialog.transform.Find("yes").gameObject.GetComponent<Button>().onClick.AddListener(new UnityEngine.Events.UnityAction(() => { Stop(); stopDialog.SetActive(false); }));
     }
+    /**
+     * <summary>
+     * Terminates the full process on the server
+     * </summary>
+     */
     public void Stop()
     {
         new StopCommand().PostPlay();
     }
 
+    /**
+     * <summary>
+     * Saves the current information to a save file
+     * </summary>
+     */
     public void Save()
     {
         Parser.Encode(commands);
     }
 
+    /**
+     * <summary>
+     * Checks if any <see cref="PartCommandList"/> in the current <see cref="CommandList"/> aren't referenced anymore and thus to be removed.
+     * </summary>
+     */
     public void CheckLists()
     {
-        List<PartCommandList> liststoRemove = new List<PartCommandList>();
-        for (int i = 1; i < commands.list.Count; i++)
+        // Searches for non-referenced lists
+        List<PartCommandList> listsToRemove = new List<PartCommandList>();
+        for (int i = 0; i < commands.lists.Count; i++)
         {
-            bool hasverweis = false;
-            foreach(PartCommandList list in commands.list)
+            bool hasReference = false;
+            foreach(PartCommandList list in commands.lists)
             {
                 foreach (Command cmd in list.list)
-                {
-                    //Debug.Log("BRAH");
-                    if (cmd.GetType().Equals(typeof(SplitCommand)))
-                    {
-                        //Debug.Log("BREH");
-                        if (((SplitCommand)cmd).newList == i)
-                        {
-                            //Debug.Log("BRUH");
-                            hasverweis = true;
-                        }
-                    }
-                }
-                if (!hasverweis)
-                    liststoRemove.Add(list);
+                    if (cmd.GetType().Equals(typeof(SplitCommand)) && ((SplitCommand)cmd).newList == i)
+                        hasReference = true;
+
+                if (!hasReference)
+                    listsToRemove.Add(list);
             }
             i++;
         }
-        foreach (PartCommandList list in liststoRemove)
+
+        // Removes those lists and destroys their objects
+        foreach (PartCommandList list in listsToRemove)
         {
             int listint = 0;
-            for (int i = 0; i < commands.list.Count; i++)
-                if (commands.list[i] == list)
+            for (int i = 0; i < commands.lists.Count; i++)
+                if (commands.lists[i] == list)
                     listint = i;
-            Debug.Log("Removing list #: " + listint.ToString());
-            commands.list.Remove(list);
+
+            commands.lists.Remove(list);
             Destroy(list.listObject);
         }
 
-        if (commands.list.Count == 0)
+        // Displays the "nothing here" message if there are no lists left
+        if (commands.lists.Count == 0)
             nothing.SetActive(true);
         else
             nothing.SetActive(false);
     }
-
-    public void Brightnesstest(Slider slider)
-    {
-        WWWForm www = new WWWForm();
-
-        www.AddField("brightness[]", "brightness;" + slider.value.ToString());
-        Debug.Log(slider.value.ToString());
-        this.gameObject.GetComponent<Network>().Request(www);
-    }
-    public void BrightnessStop()
-    {
-        WWWForm www = new WWWForm();
-
-        www.AddField("brightness[]", "terminate");
-
-        this.gameObject.GetComponent<Network>().Request(www);
-    }
 }
 
+/**
+ * <summary>
+ * Helper class for prsing and enconding information about <see cref="CommandList"/> objects
+ * </summary>
+ */
 public static class Parser
 {
+    /**
+     * <summary>
+     * Parses the <see cref="CommandList"/> with the specified file name to an object
+     * </summary>
+     */
     public static CommandList Parse(string name = "base")
     {
-        Dictionary<string, object> inputt;
+        Dictionary<string, object> jsonData;
         
+        // Check if the files Directory exists, if not, create it
         string dataPath = Application.persistentDataPath + "/commandlists";
         if (!Directory.Exists(dataPath))
             Directory.CreateDirectory(dataPath);
-
-        //Debug.Log(name);
+        
+        // Read from the file, handle cases the specified file, or even the standard file doesnt exist
         if (File.Exists(dataPath + "/" + name + ".json"))
         {
             using (StreamReader sr = new StreamReader(dataPath + "/" + name + ".json"))
             {
-                inputt = JsonConvert.DeserializeObject<Dictionary<string, object>>(sr.ReadLine());
+                jsonData = JsonConvert.DeserializeObject<Dictionary<string, object>>(sr.ReadLine());
             }
             
-            //Debug.Log("Yes, this file exists");
         }
         else if (File.Exists(dataPath + "/base.json"))
         {
             using (StreamReader sr = new StreamReader(dataPath + "/base.json"))
             {
-                inputt = JsonConvert.DeserializeObject<Dictionary<string, object>>(sr.ReadLine());
+                jsonData = JsonConvert.DeserializeObject<Dictionary<string, object>>(sr.ReadLine());
             }
             PlayerPrefs.SetString("list", "base");
-            //Debug.Log("Yes, this file exists");
-        } else
+        }
+        else
         {
-            //Debug.Log("no, fuck yu");
-            inputt = new Dictionary<string, object>();
+            jsonData = new Dictionary<string, object>();
         }
 
-        
-        
-        CommandList commandss;
-        if (inputt.Count > 0)
-        {
-            if (inputt.TryGetValue("name", out object nam))
-                commandss = new CommandList(name, (string)nam);
+        // Parse the string to an object
+        CommandList newCommandList;
+        if (jsonData.Count > 0)
+        { 
+            // Try get the name of the list
+            if (jsonData.TryGetValue("name", out object dataName))
+                newCommandList = new CommandList(name, (string) dataName);
             else
-                commandss = new CommandList(name, "Some List");
+                newCommandList = new CommandList(name, "Some List");
 
-            if (inputt.TryGetValue("parts", out object partlistobj))
+            // Try get the content of the list
+            if (jsonData.TryGetValue("parts", out object partlistobj))
             {
-                List<List<Dictionary<string, object>>> partlist = ((Newtonsoft.Json.Linq.JArray)partlistobj).ToObject<List<List<Dictionary<string, object>>>>();
-                foreach (List<Dictionary<string, object>> part in partlist)
+                // Iterate over each PartCommandList in the JSON data
+                foreach (List<Dictionary<string, object>> part in ((Newtonsoft.Json.Linq.JArray)partlistobj).ToObject<List<List<Dictionary<string, object>>>>())
                 {
-                    PartCommandList parrr = new PartCommandList();
+                    PartCommandList newPart = new PartCommandList();
+                    // Iterate over each Command in that list in the JSON data
                     foreach (Dictionary<string, object> cmd in part)
                     {
                         if (cmd.TryGetValue("commandTitle", out object commandTitle))
                         {
+                            // Incase there is a commandTitle specified in JSON, try and get meaning from it
                             Command newCmd = null;
                             switch (commandTitle)
                             {
+                                // Incase the title means something, try and get the values for that specific Command
                                 case "rainbow":
                                     newCmd = new RainbowCommand();
                                     if (cmd.TryGetValue("wait_ms", out object wait_ms)) ((RainbowCommand)newCmd).wait_ms = Convert.ToInt32(wait_ms);
@@ -469,9 +531,7 @@ public static class Parser
                                     if (cmd.TryGetValue("color", out color)) ((InterpolateCommand)newCmd).color = Helper.ToColor(Convert.ToInt32(color));
                                     if (cmd.TryGetValue("color2", out object color2)) ((InterpolateCommand)newCmd).color2 = Helper.ToColor(Convert.ToInt32(color2));
                                     if (cmd.TryGetValue("duration_ms", out object duration_ms)) ((InterpolateCommand)newCmd).duration_ms = Convert.ToInt32(duration_ms);
-                                    if (cmd.TryGetValue("goback", out object goback))
-                                        Debug.Log(goback.GetType());
-                                        ((InterpolateCommand)newCmd).goback = (bool)goback;
+                                    if (cmd.TryGetValue("goback", out object goback)) ((InterpolateCommand)newCmd).goback = (bool)goback;
                                     break;
                                 case "wait":
                                     newCmd = new WaitCommand();
@@ -488,29 +548,28 @@ public static class Parser
                                     if (cmd.TryGetValue("waitlist", out object waitlist)) ((JoinCommand)newCmd).waitlist = (bool)waitlist;
                                     break;
                             }
+                            // Only add to list if the title meant sth
                             if (newCmd != null)
                             {
                                 if (cmd.TryGetValue("title", out object title)) newCmd.title = (string)title;
                                 if (cmd.TryGetValue("lamps", out object lamps)) newCmd.lamps = ((Newtonsoft.Json.Linq.JArray)lamps).ToObject<List<int>>();
-                                parrr.AddHidden(newCmd);
+                                newPart.AddHidden(newCmd);
                             }
                             
                         }
                     }
-                    commandss.list.Add(parrr);
+                    newCommandList.lists.Add(newPart);
                 }
             }
-
-            return commandss;
+            return newCommandList;
         }
-
-        //Debug.Log(string.Join("      *      ", parts));
-        //Debug.Log(string.Join(" ; ", partss[0]));
-        //Debug.Log(string.Join(" ; ", partss[1]));
-        //Debug.Log(string.Join(";", commands.list));
-
-        return null;
+        return new CommandList();
     }
+    /**
+     * <summary>
+     * Parses all available files in the commandslists directory to <see cref="CommandList"/> objects
+     * </summary>
+     */
     public static List<CommandList> ParseAll()
     {
         List<string> files = Parser.FetchLists();
@@ -523,12 +582,15 @@ public static class Parser
 
         return output;
     }
-
+    /**
+     * <summary>
+     * Fetches all available file names for parsing from the standard directory
+     * </summary>
+     */
     public static List<string> FetchLists()
     {
         List<string> output = new List<string>();
-
-#if UNITY_ANDROID
+        
         if (!Directory.Exists(Application.persistentDataPath + "/commandlists"))
             Directory.CreateDirectory(Application.persistentDataPath + "/commandlists");
 
@@ -539,37 +601,30 @@ public static class Parser
             if (Path.GetFileName(s).EndsWith(".json"))
                 output.Add(Path.GetFileNameWithoutExtension(s));
         }
-#endif
-
-        //Debug.Log(string.Join(", ", output));
 
         return output;
     }
 
+    /**
+     * <summary>
+     * Encodes the supplied <see cref="CommandList"/> to a file named appropriatly
+     * </summary>
+     */
     public static void Encode(CommandList commands)
     {
-#if UNITY_ANDROID
-        //Debug.Log("Datapath: " + Application.persistentDataPath);
         if (!Directory.Exists(Application.persistentDataPath + "/commandlists"))
             Directory.CreateDirectory(Application.persistentDataPath + "/commandlists");
-
-        /*
-        using (StreamWriter sw = new StreamWriter(Application.persistentDataPath + "/commandlists/" + commands.name + ".txt"))
-        {
-            sw.Write(string.Join("#", commands.GetSaveStrings()));
-        }
-        using (StreamWriter sw = new StreamWriter(Application.persistentDataPath + "/commandlists/" + commands.name + "_settings.txt"))
-        {
-            sw.Write(string.Join("#", commands.title));
-        }
-        */
 
         using (StreamWriter sw = new StreamWriter(Application.persistentDataPath + "/commandlists/" + commands.name + ".json"))
         {
             sw.Write(JsonConvert.SerializeObject(commands.GetSaveDics()));
         }
-#endif
     }
+    /**
+     * <summary>
+     * Encodes all supplied <see cref="CommandList"/> to files named appropriatly
+     * </summary>
+     */
     public static void Encode(List<CommandList> lists)
     {
         foreach (CommandList cmd in lists)

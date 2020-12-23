@@ -5,16 +5,18 @@ using UnityEngine.UI;
 
 public class Settings : MonoBehaviour
 {
-    Command command;
-    CommandList cmdlist;
+    Command lastCommand;
+    CommandList lastCommandList;
 
+    /// <summary>Marker if the last object to open the settings was a single <see cref="Command"/> or a <see cref="CommandList"/></summary>
     bool lastWasCommand;
 
+    // Settings input Gameobjects
     public GameObject commandSelect;
     public GameObject title;
     public GameObject lamps;
     public GameObject colorwheel;
-    public GameObject colorwheel2;
+    public GameObject colorwheel_2;
     public GameObject wait_ms;
     public GameObject duration_ms;
     public GameObject iterations;
@@ -26,32 +28,16 @@ public class Settings : MonoBehaviour
 
     public GameObject lampsModify;
 
-    // Start is called before the first frame update
-    void Start()
-    {
-        /*
-        commandSelect.transform.GetChild(0).GetComponent<Dropdown>().options = new List<Dropdown.OptionData>() {
-            new Dropdown.OptionData("rainbow"),
-            new Dropdown.OptionData("theaterChase"),
-            new Dropdown.OptionData("rainbowStationary"),
-            new Dropdown.OptionData("theaterChaseRainbow"),
-            new Dropdown.OptionData("interpolate"),
-            new Dropdown.OptionData("colorWipe"),
-            new Dropdown.OptionData("setColor")
-        };
-        */
-    }
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
+    /**
+     * <summary>
+     * Opens the settings window with all required inputs for the supplied <see cref="Command"/>
+     * </summary>
+     */
     public void openSettings(Command cmd)
     {
         HideAll();
 
-        command = cmd;
+        lastCommand = cmd;
         lastWasCommand = true;
         Dictionary<Setting, object> sets = cmd.GetSettings();
         foreach (Setting s in cmd.settings)
@@ -60,13 +46,11 @@ public class Settings : MonoBehaviour
                 case Setting.COLOR:
                     colorwheel.SetActive(true);
                     colorwheel.transform.GetChild(0).GetComponent<ColorWheelControl>().PickColor((Color) sets[Setting.COLOR]);
-                    //Debug.Log((Color)sets[Setting.COLOR]);
                     break;
 
-                case Setting.COLOR2:
-                    colorwheel2.SetActive(true);
-                    colorwheel2.transform.GetChild(0).GetComponent<ColorWheelControl>().PickColor((Color)sets[Setting.COLOR2]);
-                    //Debug.Log((Color)sets[Setting.COLOR]);
+                case Setting.COLOR_2:
+                    colorwheel_2.SetActive(true);
+                    colorwheel_2.transform.GetChild(0).GetComponent<ColorWheelControl>().PickColor((Color)sets[Setting.COLOR_2]);
                     break;
 
                 case Setting.WAIT_MS:
@@ -163,10 +147,15 @@ public class Settings : MonoBehaviour
 
         this.gameObject.SetActive(true);
     }
+    /**
+     * <summary>
+     * Opens the settings window with all required inputs for the supplied <see cref="CommandList"/>
+     * </summary>
+     */
     public void openSettings(CommandList list)
     {
         HideAll();
-        cmdlist = list;
+        lastCommandList = list;
         lastWasCommand = false;
 
         Dictionary<Setting, object> sets = list.GetSettings();
@@ -184,16 +173,19 @@ public class Settings : MonoBehaviour
 
         this.gameObject.SetActive(true);
     }
+    /**
+     * <summary>
+     * Closes the settings window and, if applicable, saves the settings to the object that the window was last opened with
+     * </summary>
+     */
     public void closeSettings(bool saveChanges)
     {
         if (saveChanges)
         {
-            //Debug.Log("FUCK");
             Dictionary<Setting, object> sets = new Dictionary<Setting, object>();
-
             bool changeCommand = false;
 
-            foreach (Setting s in lastWasCommand ? command.settings : cmdlist.settings)
+            foreach (Setting s in lastWasCommand ? lastCommand.settings : lastCommandList.settings)
             {
                 switch (s)
                 {
@@ -201,8 +193,8 @@ public class Settings : MonoBehaviour
                         sets.Add(Setting.COLOR, colorwheel.transform.GetChild(0).GetComponent<ColorWheelControl>().Selection);
                         break;
 
-                    case Setting.COLOR2:
-                        sets.Add(Setting.COLOR2, colorwheel2.transform.GetChild(0).GetComponent<ColorWheelControl>().Selection);
+                    case Setting.COLOR_2:
+                        sets.Add(Setting.COLOR_2, colorwheel_2.transform.GetChild(0).GetComponent<ColorWheelControl>().Selection);
                         break;
 
                     case Setting.WAIT_MS:
@@ -218,7 +210,7 @@ public class Settings : MonoBehaviour
                         break;
 
                     case Setting.COMMAND:
-                        if (commandSelect.transform.GetChild(0).GetComponent<Dropdown>().options[commandSelect.transform.GetChild(0).GetComponent<Dropdown>().value].text != command.commandTitle)
+                        if (commandSelect.transform.GetChild(0).GetComponent<Dropdown>().options[commandSelect.transform.GetChild(0).GetComponent<Dropdown>().value].text != lastCommand.commandTitle)
                             changeCommand = true;
                         break;
                     case Setting.TITLE:
@@ -234,7 +226,7 @@ public class Settings : MonoBehaviour
                         break;
                     case Setting.SPLITLIST:
                         int inputint = int.Parse(splitlist.transform.Find("input").GetComponent<InputField>().text);
-                        int count = GameObject.Find("Main Camera").GetComponent<Main>().commands.list.Count;
+                        int count = GameObject.Find("Main Camera").GetComponent<Main>().commands.lists.Count;
                         sets.Add(Setting.SPLITLIST, int.Parse(splitlist.transform.Find("input").GetComponent<InputField>().text));
                         if (inputint >= count)
                             GameObject.Find("Main Camera").GetComponent<Main>().AddList();
@@ -253,19 +245,19 @@ public class Settings : MonoBehaviour
 
             if (lastWasCommand)
             {
-                command.SaveSettings(sets);
+                lastCommand.SaveSettings(sets);
                 GameObject.Find("Main Camera").GetComponent<Main>().Save();
-                command.Render();
+                lastCommand.Render();
             }
             else
             {
-                cmdlist.SaveSettings(sets);
+                lastCommandList.SaveSettings(sets);
                 GameObject.Find("Main Camera").GetComponent<ListViewMain>().Save();
-                cmdlist.IndivRender();
+                lastCommandList.IndivRender();
             }
 
             if (changeCommand)
-                GameObject.Find("Main Camera").GetComponent<Main>().ChangeCommand(command,
+                GameObject.Find("Main Camera").GetComponent<Main>().ChangeCommand(lastCommand,
                     commandSelect.transform.GetChild(0).GetComponent<Dropdown>().options
                     [commandSelect.transform.GetChild(0).GetComponent<Dropdown>().value]
                     .text);
@@ -274,30 +266,37 @@ public class Settings : MonoBehaviour
         this.gameObject.SetActive(false);
     }
 
+    /**
+     * <summary>
+     * Opens the lamps window that overlays the settings window for configuration of the lamps that are used for the <see cref="Command"/>
+     * </summary>
+     */
     public void openLamps()
     {
+        // Enables the window view onscreen
         lampsModify.SetActive(true);
 
+        // Parses the lamp config information in the saved string to an integer list
         Transform content = lampsModify.transform.Find("Scroll View/Viewport/Content");
-        List<int> newList = new List<int>();
-        newList.AddRange(Array.ConvertAll(lamps.transform.Find("numbers").GetComponent<Text>().text.Split(','), s => int.Parse(s)));
+        List<int> lampList = new List<int>(Array.ConvertAll(lamps.transform.Find("numbers").GetComponent<Text>().text.Split(','), s => int.Parse(s)));
 
-
-        if (newList.Count > 0)
+        // If there is any configuration, apply that configuration to all input labels onscreen
+        if (lampList.Count > 0)
         {
             for (int i = 0; i < content.childCount; i++)
             {
-                if (newList.Contains(i))
+                if (lampList.Contains(i)) // Case the lamp is in the configuration (enabled)
                 {
                     content.GetChild(i).GetComponent<Toggle>().isOn = true;
                     content.GetChild(i).Find("Label").GetComponent<Text>().text = "Lamp " + i.ToString();
-                } else
+                } else // Case its not (disabled)
+
                 {
                     content.GetChild(i).GetComponent<Toggle>().isOn = false;
                     content.GetChild(i).Find("Label").GetComponent<Text>().text = "Lamp " + i.ToString();
                 }
             }
-        } else
+        } else // if there is none, enable all input labels onscreen (in other words using all lamps)
         {
             for (int i=0; i < content.childCount; i++)
             {
@@ -306,6 +305,11 @@ public class Settings : MonoBehaviour
             }
         }
     }
+    /**
+     * <summary>
+     * Closes the lamps window and, if applicable, saves the configuration to the <see cref="Command"/>
+     * </summary>
+     */
     public void closeLamps(bool saveChanges)
     {
         if (saveChanges)
@@ -322,14 +326,19 @@ public class Settings : MonoBehaviour
             lamps.transform.Find("numbers").GetComponent<Text>().text = string.Join(",", newList);
         }
 
-
+        // Disables the window view onscreen
         lampsModify.SetActive(false);
     }
 
+    /**
+     * <summary>
+     * Hides every input field
+     * </summary>
+     */
     public void HideAll()
     {
         colorwheel.SetActive(false);
-        colorwheel2.SetActive(false);
+        colorwheel_2.SetActive(false);
         wait_ms.SetActive(false);
         duration_ms.SetActive(false);
         iterations.SetActive(false);
@@ -343,21 +352,30 @@ public class Settings : MonoBehaviour
         looplist.SetActive(false);
     }
 
+    /**
+     * <summary>
+     * Corrects the number of PartCommandLists if the new <see cref="SplitCommand"/> references any not yet existing list
+     * </summary>
+     */
     public void CorrectListNumIfWrong()
     {
         InputField input = splitlist.transform.Find("input").GetComponent<InputField>();
-        int count = GameObject.Find("Main Camera").GetComponent<Main>().commands.list.Count;
+        int count = GameObject.Find("Main Camera").GetComponent<Main>().commands.lists.Count;
         if (int.Parse(input.text) >= count)
         {
             input.text = count.ToString();
             splitlist.transform.Find("newlist").gameObject.SetActive(true);
-        } else
-        {
+        } else {
             splitlist.transform.Find("newlist").gameObject.SetActive(false);
         }
     }
 }
 
+/**
+ * <summary>
+ * Houses all different settings to prevent typos on saving and extracting to and from dictionarys
+ * </summary>
+ */
 public enum Setting
 {
     // Command base class
@@ -366,7 +384,7 @@ public enum Setting
     LAMPS,
     // Colors
     COLOR,
-    COLOR2,
+    COLOR_2,
     // Integers
     WAIT_MS,
     DURATION_MS,
